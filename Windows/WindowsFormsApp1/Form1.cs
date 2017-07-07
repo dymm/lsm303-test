@@ -12,7 +12,8 @@ using System.Windows.Forms;
 //https://msdn.microsoft.com/fr-fr/library/system.io.ports.serialport(v=vs.110).aspx
 using System.IO.Ports;
 using System.Threading;
-using OpenGL;
+using OpenTK;
+using OpenTK.Graphics.OpenGL;
 
 namespace WindowsFormsApp1
 {
@@ -31,6 +32,11 @@ namespace WindowsFormsApp1
         private double m_mx = 0.0;
         private double m_my = 0.0;
         private double m_mz = 0.0;
+
+        private System.Object lockRenderData = new System.Object();
+        private double m_viewAngleX = 0.0;
+        private double m_viewAngleY = 0.0;
+        private double m_viewAngleZ = 0.0;
 
 
         public MainForm()
@@ -99,6 +105,7 @@ namespace WindowsFormsApp1
             comboBoxAccelMinMax.Items.Add(8.0);
             comboBoxAccelMinMax.SelectedIndex = 0;
 
+            glControl_Resize(glControl, EventArgs.Empty);   // Ensure the Viewport is set up correctly
         }
 
         private void comboBoxAccelMinMax_SelectedIndexChanged(object sender, EventArgs e)
@@ -132,7 +139,7 @@ namespace WindowsFormsApp1
             }
             lock (lockRenderData)
             {
-                RenderControl.Refresh();
+                glControl.Invalidate();
             }
         }
 
@@ -242,123 +249,99 @@ namespace WindowsFormsApp1
                 m_mz = mz;
             }
             lock(lockRenderData) {
-                _viewAngleX = Math.Asin(-gxnorm);
-                _viewAngleZ = Math.Asin(gynorm / Math.Cos(_viewAngleX));
-                double viewAngleY = (Math.Atan2(my,mx) * 180.0) / Math.PI;
+                m_viewAngleX = Math.Asin(-gxnorm);
+                m_viewAngleZ = Math.Asin(gynorm / Math.Cos(m_viewAngleX));
 
-                if (viewAngleY < 0)   // Normalize to 0-360
+                m_viewAngleY = (Math.Atan2(my,mx) * 180.0) / Math.PI;
+                if (m_viewAngleY < 0)   // Normalize to 0-360
                 {
-                    _viewAngleY = 360 + viewAngleY;
-                } else
-                {
-                    _viewAngleY = viewAngleY;
+                    m_viewAngleY = 360 + m_viewAngleY;
                 }
             }
         }
 
-        //OpenGL view by OpenGL.Net : https://github.com/luca-piccioni/OpenGL.Net
-        #region OpenGL
-
-        private void RenderControl_ContextCreated(object sender, GlControlEventArgs e)
+        private void glControl_Resize(object sender, EventArgs e)
         {
-            GlControl glControl = (GlControl)sender;
+            OpenTK.GLControl c = sender as OpenTK.GLControl;
 
-            // Here you can allocate resources or initialize state
-            Gl.MatrixMode(MatrixMode.Projection);
-            Gl.LoadIdentity();
-            Gl.Ortho(-1.0, 1.0, -1.0, 1.0, 0.0, 10.0);
+            if (c.ClientSize.Height == 0)
+                c.ClientSize = new System.Drawing.Size(c.ClientSize.Width, 1);
 
-            // Uses multisampling, if available
-            if (glControl.MultisampleBits > 0)
-                Gl.Enable(EnableCap.Multisample);
+            GL.CullFace(CullFaceMode.FrontAndBack);
+            GL.Viewport(0, 0, c.ClientSize.Width, c.ClientSize.Height);
 
+            float aspect_ratio = Width / (float)Height;
+            Matrix4 perpective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, aspect_ratio, 1, 64);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadMatrix(ref perpective);
+            GL.Enable(EnableCap.DepthTest);
+            GL.DepthMask(true);
         }
 
-        private void RenderControl_Render(object sender, GlControlEventArgs e)
+        private void glControl_Paint(object sender, PaintEventArgs e)
         {
-            RenderControl_Render_GL(sender, e);
+            Render();
         }
 
-        private void RenderControl_ContextUpdate(object sender, GlControlEventArgs e)
+        private void Render()
         {
+            Matrix4 lookat = Matrix4.LookAt(0, 5, 5, 0, 0, 0, 0, 1, 0);
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadMatrix(ref lookat);
 
+            GL.Rotate(m_viewAngleX, 0.0f, 1.0f, 0.0f);
+            GL.Rotate(m_viewAngleY, 0.0f, 1.0f, 0.0f);
+            GL.Rotate(m_viewAngleZ, 0.0f, 1.0f, 0.0f);
+
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            DrawCube();
+            glControl.SwapBuffers();
         }
 
-        private void RenderControl_ContextDestroying(object sender, GlControlEventArgs e)
+        private void DrawCube()
         {
-            // Here you can dispose resources allocated in RenderControl_ContextCreated
+            GL.Begin(BeginMode.Quads);
+
+            GL.Color3(Color.Silver);
+            GL.Vertex3(-1.0f, -1.0f, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+            GL.Vertex3(1.0f, 1.0f, -1.0f);
+            GL.Vertex3(1.0f, -1.0f, -1.0f);
+
+            GL.Color3(Color.Honeydew);
+            GL.Vertex3(-1.0f, -1.0f, -1.0f);
+            GL.Vertex3(1.0f, -1.0f, -1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+
+            GL.Color3(Color.Moccasin);
+
+            GL.Vertex3(-1.0f, -1.0f, -1.0f);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+
+            GL.Color3(Color.IndianRed);
+            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+
+            GL.Color3(Color.PaleVioletRed);
+            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, 1.0f, -1.0f);
+
+            GL.Color3(Color.ForestGreen);
+            GL.Vertex3(1.0f, -1.0f, -1.0f);
+            GL.Vertex3(1.0f, 1.0f, -1.0f);
+            GL.Vertex3(1.0f, 1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f, 1.0f);
+
+            GL.End();
         }
-
-        #endregion
-
-        #region Common Data
-
-        private System.Object lockRenderData = new System.Object();
-        private double _viewAngleX = 0.0;
-        private double _viewAngleY = 0.0;
-        private double _viewAngleZ = 0.0;
-
-        /// <summary>
-        /// Vertex position array.
-        /// </summary>
-        private static readonly float[] _ArrayPosition = new float[] {
-            0.0f, -1.0f,
-            0.0f, 0.0f,
-            1.0f, 0.0f
-        };
-
-        /// <summary>
-        /// Vertex color array.
-        /// </summary>
-        private static readonly float[] _ArrayColor = new float[] {
-            1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 1.0f
-        };
-
-        #endregion
-
-        #region GL Resources
-
-        private void RenderControl_Render_GL(object sender, GlControlEventArgs e)
-        {
-            Control senderControl = (Control)sender;
-
-            Gl.Viewport(0, 0, senderControl.ClientSize.Width, senderControl.ClientSize.Height);
-            Gl.Clear(ClearBufferMask.ColorBufferBit);
-
-            // Animate triangle
-            Gl.MatrixMode(MatrixMode.Modelview);
-            Gl.LoadIdentity();
-
-            lock (lockRenderData)
-            {
-                Gl.Rotate(_viewAngleX, 1.0f, 0.0f, 0.0f);
-                Gl.Rotate(_viewAngleY, 0.0f, 1.0f, 0.0f);
-                Gl.Rotate(_viewAngleZ, 0.0f, 0.0f, 1.0f);
-            }
-
-            // Old school OpenGL 1.1
-            // Setup & enable client states to specify vertex arrays, and use Gl.DrawArrays instead of Gl.Begin/End paradigm
-            using (MemoryLock vertexArrayLock = new MemoryLock(_ArrayPosition))
-            using (MemoryLock vertexColorLock = new MemoryLock(_ArrayColor))
-            {
-                // Note: the use of MemoryLock objects is necessary to pin vertex arrays since they can be reallocated by GC
-                // at any time between the Gl.VertexPointer execution and the Gl.DrawArrays execution
-
-                Gl.VertexPointer(2, VertexPointerType.Float, 0, vertexArrayLock.Address);
-                Gl.EnableClientState(EnableCap.VertexArray);
-
-                Gl.ColorPointer(3, ColorPointerType.Float, 0, vertexColorLock.Address);
-                Gl.EnableClientState(EnableCap.ColorArray);
-
-                Gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
-            }
-
-        }
-
-
-        #endregion
 
 
     }

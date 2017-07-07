@@ -67,8 +67,8 @@
             this.label9 = new System.Windows.Forms.Label();
             this.textBoxMagnetX = new System.Windows.Forms.TextBox();
             this.label10 = new System.Windows.Forms.Label();
-            this.RenderControl = new OpenGL.GlControl();
             this.timerUpdateValues = new System.Windows.Forms.Timer(this.components);
+            this.glControl = new OpenTK.GLControl();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.Magnetometer.SuspendLayout();
@@ -446,33 +446,28 @@
             this.label10.TabIndex = 0;
             this.label10.Text = "X :";
             // 
-            // RenderControl
-            // 
-            this.RenderControl.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.RenderControl.ColorBits = ((uint)(24u));
-            this.RenderControl.DepthBits = ((uint)(0u));
-            this.RenderControl.Location = new System.Drawing.Point(12, 336);
-            this.RenderControl.MultisampleBits = ((uint)(0u));
-            this.RenderControl.Name = "RenderControl";
-            this.RenderControl.Size = new System.Drawing.Size(476, 307);
-            this.RenderControl.StencilBits = ((uint)(0u));
-            this.RenderControl.TabIndex = 12;
-            this.RenderControl.ContextCreated += new System.EventHandler<OpenGL.GlControlEventArgs>(this.RenderControl_ContextCreated);
-            this.RenderControl.ContextDestroying += new System.EventHandler<OpenGL.GlControlEventArgs>(this.RenderControl_ContextDestroying);
-            this.RenderControl.Render += new System.EventHandler<OpenGL.GlControlEventArgs>(this.RenderControl_Render);
-            this.RenderControl.ContextUpdate += new System.EventHandler<OpenGL.GlControlEventArgs>(this.RenderControl_ContextUpdate);
-            // 
             // timerUpdateValues
             // 
             this.timerUpdateValues.Enabled = true;
             this.timerUpdateValues.Tick += new System.EventHandler(this.timerUpdateValues_Tick);
+            // 
+            // glControl
+            // 
+            this.glControl.BackColor = System.Drawing.Color.Black;
+            this.glControl.Location = new System.Drawing.Point(16, 334);
+            this.glControl.Name = "glControl";
+            this.glControl.Size = new System.Drawing.Size(472, 308);
+            this.glControl.TabIndex = 12;
+            this.glControl.VSync = false;
+            this.glControl.Paint += new System.Windows.Forms.PaintEventHandler(this.glControl_Paint);
+            this.glControl.Resize += new System.EventHandler(this.glControl_Resize);
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(506, 654);
-            this.Controls.Add(this.RenderControl);
+            this.Controls.Add(this.glControl);
             this.Controls.Add(this.Magnetometer);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
@@ -526,12 +521,12 @@
         private System.Windows.Forms.Label label18;
         private System.Windows.Forms.Label label17;
         private System.Windows.Forms.Label label16;
-        private OpenGL.GlControl RenderControl;
         private System.Windows.Forms.Timer timerUpdateValues;
         private System.Windows.Forms.Label label19;
         private System.Windows.Forms.ComboBox comboBoxMagnMinMax;
         private System.Windows.Forms.Label label20;
         private System.Windows.Forms.ComboBox comboBoxAccelMinMax;
+        private OpenTK.GLControl glControl;
     }
 }
 
