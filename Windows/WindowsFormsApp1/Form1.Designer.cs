@@ -474,6 +474,7 @@
             this.MaximizeBox = false;
             this.Name = "MainForm";
             this.Text = "LSM303";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();

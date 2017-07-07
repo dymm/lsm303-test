@@ -143,14 +143,23 @@ namespace WindowsFormsApp1
             }
         }
 
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            _reading = false;
+            if (_readThread!=null && !_readThread.Join(3 * 1000)) _readThread.Interrupt();
+            _readThread = null;
+            if (_serialPort != null)
+            {
+                _serialPort.Close();
+                _serialPort = null;
+            }
+        }
+
         private void buttonConnexion_Click(object sender, EventArgs e)
         {
             if (_serialPort != null)
             {
-                _reading = false;
-                if (!_readThread.Join(3 * 1000)) _readThread.Interrupt();
-                _serialPort.Close();
-                _serialPort = null;
+                MainForm_FormClosing(null, null);
                 buttonConnexion.Text = "Connection";
             }
             else
@@ -249,17 +258,19 @@ namespace WindowsFormsApp1
                 m_mz = mz;
             }
             lock(lockRenderData) {
-                m_viewAngleX = Math.Asin(-gxnorm);
-                m_viewAngleZ = Math.Asin(gynorm / Math.Cos(m_viewAngleX));
+                m_viewAngleX = RadianToDegree(Math.Atan2(gy, gz) + Math.PI);
+                m_viewAngleY = RadianToDegree(Math.Atan2(gz, gx) + Math.PI);
+                m_viewAngleZ = RadianToDegree(Math.Atan2(gx, gy) + Math.PI);
 
-                m_viewAngleY = (Math.Atan2(my,mx) * 180.0) / Math.PI;
-                if (m_viewAngleY < 0)   // Normalize to 0-360
-                {
-                    m_viewAngleY = 360 + m_viewAngleY;
-                }
+                //m_viewAngleZ = RadianToDegree(Math.Atan2(my, mx));
             }
         }
-
+        private double RadianToDegree(double angle)
+        {
+            angle = angle * (180.0 / Math.PI);
+            if (angle > 180) angle -= 360.0;
+            return angle;
+        }
         private void glControl_Resize(object sender, EventArgs e)
         {
             OpenTK.GLControl c = sender as OpenTK.GLControl;
@@ -267,15 +278,16 @@ namespace WindowsFormsApp1
             if (c.ClientSize.Height == 0)
                 c.ClientSize = new System.Drawing.Size(c.ClientSize.Width, 1);
 
-            GL.CullFace(CullFaceMode.FrontAndBack);
-            GL.Viewport(0, 0, c.ClientSize.Width, c.ClientSize.Height);
+            GL.CullFace(CullFaceMode.Back);
 
             float aspect_ratio = Width / (float)Height;
-            Matrix4 perpective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, aspect_ratio, 1, 64);
+            Matrix4 perpective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, aspect_ratio, 0.1f, 64);
             GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
             GL.LoadMatrix(ref perpective);
             GL.Enable(EnableCap.DepthTest);
-            GL.DepthMask(true);
+            GL.DepthFunc(DepthFunction.Less);// 'Enable correct Z Drawings
+            GL.Viewport(0, 0, c.ClientSize.Width, c.ClientSize.Height);
         }
 
         private void glControl_Paint(object sender, PaintEventArgs e)
@@ -285,17 +297,27 @@ namespace WindowsFormsApp1
 
         private void Render()
         {
-            Matrix4 lookat = Matrix4.LookAt(0, 5, 5, 0, 0, 0, 0, 1, 0);
+            Matrix4 lookat = Matrix4.LookAt(5, 5, 5, 0, 0, 0, 0, 1, 0);
             GL.MatrixMode(MatrixMode.Modelview);
             GL.LoadMatrix(ref lookat);
 
-            GL.Rotate(m_viewAngleX, 0.0f, 1.0f, 0.0f);
-            GL.Rotate(m_viewAngleY, 0.0f, 1.0f, 0.0f);
-            GL.Rotate(m_viewAngleZ, 0.0f, 1.0f, 0.0f);
-
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
+            DrawAxis(0.1f, 2.0f);
+
+            GL.PushMatrix();
+            GL.Translate(-0.5, 0.6, 0.0);
+            GL.Rotate(m_viewAngleX, 1.0f, 1.0f, 0.0f);
+            GL.Rotate(m_viewAngleY, 0.0f, 1.0f, 0.0f);
+            GL.Rotate(m_viewAngleZ, 0.0f, 0.0f, 1.0f);
+            DrawAxis(0.05f, 1.0f);
+            GL.PopMatrix();
+
+            GL.Rotate(m_viewAngleX, 1.0f, 1.0f, 0.0f);
+            GL.Rotate(m_viewAngleY, 0.0f, 1.0f, 0.0f);
+            GL.Rotate(m_viewAngleZ, 0.0f, 0.0f, 1.0f);
             DrawCube();
+
             glControl.SwapBuffers();
         }
 
@@ -303,46 +325,68 @@ namespace WindowsFormsApp1
         {
             GL.Begin(BeginMode.Quads);
 
+            float ys = 0.1f;
+
             GL.Color3(Color.Silver);
-            GL.Vertex3(-1.0f, -1.0f, -1.0f);
-            GL.Vertex3(-1.0f, 1.0f, -1.0f);
-            GL.Vertex3(1.0f, 1.0f, -1.0f);
-            GL.Vertex3(1.0f, -1.0f, -1.0f);
+            GL.Vertex3(-1.0f, -1.0f * ys, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f * ys, -1.0f);
+            GL.Vertex3(1.0f, 1.0f * ys, -1.0f);
+            GL.Vertex3(1.0f, -1.0f * ys, -1.0f);
 
             GL.Color3(Color.Honeydew);
-            GL.Vertex3(-1.0f, -1.0f, -1.0f);
-            GL.Vertex3(1.0f, -1.0f, -1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
+            GL.Vertex3(-1.0f, -1.0f * ys, -1.0f);
+            GL.Vertex3(1.0f, -1.0f * ys, -1.0f);
+            GL.Vertex3(1.0f, -1.0f * ys, 1.0f);
+            GL.Vertex3(-1.0f, -1.0f * ys, 1.0f);
 
             GL.Color3(Color.Moccasin);
 
-            GL.Vertex3(-1.0f, -1.0f, -1.0f);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, -1.0f);
+            GL.Vertex3(-1.0f, -1.0f * ys, -1.0f);
+            GL.Vertex3(-1.0f, -1.0f * ys, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f * ys, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f * ys, -1.0f);
 
             GL.Color3(Color.IndianRed);
-            GL.Vertex3(-1.0f, -1.0f, 1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
+            GL.Vertex3(-1.0f, -1.0f * ys, 1.0f);
+            GL.Vertex3(1.0f, -1.0f * ys, 1.0f);
+            GL.Vertex3(1.0f, 1.0f * ys, 1.0f);
+            GL.Vertex3(-1.0f, 1.0f * ys, 1.0f);
 
             GL.Color3(Color.PaleVioletRed);
-            GL.Vertex3(-1.0f, 1.0f, -1.0f);
-            GL.Vertex3(-1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, 1.0f, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f * ys, -1.0f);
+            GL.Vertex3(-1.0f, 1.0f * ys, 1.0f);
+            GL.Vertex3(1.0f, 1.0f * ys, 1.0f);
+            GL.Vertex3(1.0f, 1.0f * ys, -1.0f);
 
             GL.Color3(Color.ForestGreen);
-            GL.Vertex3(1.0f, -1.0f, -1.0f);
-            GL.Vertex3(1.0f, 1.0f, -1.0f);
-            GL.Vertex3(1.0f, 1.0f, 1.0f);
-            GL.Vertex3(1.0f, -1.0f, 1.0f);
+            GL.Vertex3(1.0f, -1.0f * ys, -1.0f);
+            GL.Vertex3(1.0f, 1.0f * ys, -1.0f);
+            GL.Vertex3(1.0f, 1.0f * ys, 1.0f);
+            GL.Vertex3(1.0f, -1.0f * ys, 1.0f);
 
             GL.End();
         }
 
+        private void DrawAxis(float sp, float sg)
+        {
+            GL.Begin(BeginMode.Triangles);
 
+            GL.Color3(Color.Red);
+            GL.Vertex3(0.0f, 0.0f, -1.0f * sp);
+            GL.Vertex3(0.0f, 0.0f, 1.0f * sp);
+            GL.Vertex3(1.0f * sg, 0.0f, 0.0f);
+
+            GL.Color3(Color.Green);
+            GL.Vertex3(-1.0f * sp, 0.0f, 0.0f);
+            GL.Vertex3(1.0f * sp, 0.0f, 0.0f);
+            GL.Vertex3(0.0f, 1.0f * sg, 0.0f);
+
+            GL.Color3(Color.Blue);
+            GL.Vertex3(0.0f, -1.0f * sp, 0.0f);
+            GL.Vertex3(0.0f, 1.0f * sp, 0.0f);
+            GL.Vertex3(0.0f, 0.0f, 1.0f * sg);
+
+            GL.End();
+        }
     }
 }
